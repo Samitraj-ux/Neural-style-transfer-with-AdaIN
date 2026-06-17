@@ -1,0 +1,54 @@
+from torch.utils.data import Dataset
+import os
+from PIL import Image
+from torchvision import transforms
+class ImageDataset(Dataset):
+    def __init__(self, root, transform = None):
+        super(ImageDataset, self).__init__()
+        self.root = root
+        self.transform = transform
+        self.files = list(os.listdir(root))
+        self.files = [p for p in self.files if p.endswith(('.jpg', '.jpeg', '.png'))]
+       
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx):
+        file = self.files[idx]
+        image = Image.open(os.path.join(self.root, file)).convert('RGB')
+
+        if self.transform:
+            image = self.transform(image)
+
+        return image
+    
+
+def get_transformer(size, crop, final_size):
+    transformer = []
+    if size>0:
+        transformer.append(transforms.Resize(size))
+    if crop:
+        transformer.append(transforms.CenterCrop(final_size))
+    else:
+        transformer.append(transforms.Resize(final_size))
+    transformer.append(transforms.ToTensor())
+    return transforms.Compose(transformer)
+    
+def adaptive_instance_normalization(content_feat, style_feat):
+    # [batch size, channels, h, w]
+    size = content_feat.size()
+    style_mean, style_std = calc_mean_std(style_feat)
+    content_mean, content_std = calc_mean_std(content_feat)
+    normalized_content_feat = (content_feat - content_mean.expand(size)) / content_std.expand(size)
+    return normalized_content_feat * style_std.expand(size) + style_mean.expand(size)
+
+def calc_mean_std(feat, eps=1e-5):
+    # [batch size, channels, h, w]
+    size = feat.size()
+    assert (len(size) == 4)
+    batch_size, channels = size[:2]
+    feat_mean = feat.view(batch_size, channels, -1).mean(dim=2).view(batch_size, channels, 1, 1)
+    feat_var = feat.view(batch_size, channels, -1).var(dim=2, unbiased=False) + eps
+    feat_std = feat_var.sqrt().view(batch_size, channels, 1, 1)
+    return feat_mean, feat_std
