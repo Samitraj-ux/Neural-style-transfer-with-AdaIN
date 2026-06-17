@@ -1,0 +1,8 @@
+flask
+flask-wtf
+flask-bootstrap
+wtforms
+werkzeug
+pillow
+torch
+torchvision
